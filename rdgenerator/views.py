@@ -15,6 +15,8 @@ import pyzipper
 from django.conf import settings as _settings
 from django.db.models import Q
 from .forms import GenerateForm
+from .configuration import build_custom_config
+from .network import normalize_network
 from .models import GithubRun
 from PIL import Image
 from urllib.parse import quote
@@ -62,24 +64,13 @@ def generate_custom_client(params, full_url):
     # the self-hosted update URL instead.
     if update_public_key:
         removeNewVersionNotif = False
-    server = params.get('serverIP', '')
-    serverPort = params.get('serverPort', '')
-    key = params.get('key', '')
-    apiServer = params.get('apiServer', '')
-    urlLink = params.get('urlLink', '')
-    downloadLink = params.get('downloadLink', '')
-    if not server:
-        server = 'rs-ny.rustdesk.com' #default rustdesk server
-    if not serverPort:
-        serverPort = '21116' #default rustdesk rendezvous port
-    if not key:
-        key = 'OeVuKk5nlHiXp+APNn0Y3pC1Iwpwn44JGqrQCsWqmBw=' #default rustdesk key
-    if not apiServer:
-        apiServer = server+":21114"
-    if not urlLink:
-        urlLink = "https://rustdesk.com"
-    if not downloadLink:
-        downloadLink = "https://rustdesk.com/download"
+    network = normalize_network(params)
+    server = network['server']
+    serverPort = network['serverPort']
+    key = network['key']
+    apiServer = network['apiServer']
+    urlLink = params.get('urlLink') or 'https://rustdesk.com'
+    downloadLink = params.get('downloadLink') or 'https://rustdesk.com/download'
     direction = params.get('direction', 'both')
     installation = params.get('installation', 'installationY')
     settings = params.get('settings', 'settingsY')
@@ -160,91 +151,8 @@ def generate_custom_client(params, full_url):
         privacylink_uuid = "false"
         privacylink_file = "false"
 
-    ###create the custom.txt json here and send in as inputs below
-    decodedCustom = {}
-    if direction != "Both":
-        decodedCustom['conn-type'] = direction
-    if installation == "installationN":
-        decodedCustom['disable-installation'] = 'Y'
-    if settings == "settingsN":
-        decodedCustom['disable-settings'] = 'Y'
-    if appname.upper != "rustdesk".upper and appname != "":
-        decodedCustom['app-name'] = appname
-    decodedCustom['override-settings'] = {}
-    decodedCustom['default-settings'] = {}
-    if permPass != "":
-        decodedCustom['password'] = permPass
-    if theme != "system":
-        if themeDorO == "default":
-            if platform == "windows-x86":
-                decodedCustom['default-settings']['allow-darktheme'] = 'Y' if theme == "dark" else 'N'
-            else:
-                decodedCustom['default-settings']['theme'] = theme
-        elif themeDorO == "override":
-            if platform == "windows-x86":
-                decodedCustom['override-settings']['allow-darktheme'] = 'Y' if theme == "dark" else 'N'
-            else:
-                decodedCustom['override-settings']['theme'] = theme
-    decodedCustom['enable-lan-discovery'] = 'N' if denyLan else 'Y'
-    #decodedCustom['direct-server'] = 'Y' if enableDirectIP else 'N'
-    decodedCustom['allow-auto-disconnect'] = 'Y' if autoClose else 'N'
+    decodedCustom = build_custom_config(params)
 
-    if permissionsDorO == "default":
-        decodedCustom['default-settings']['access-mode'] = permissionsType
-        decodedCustom['default-settings']['enable-keyboard'] = 'Y' if enableKeyboard else 'N'
-        decodedCustom['default-settings']['enable-clipboard'] = 'Y' if enableClipboard else 'N'
-        decodedCustom['default-settings']['enable-file-transfer'] = 'Y' if enableFileTransfer else 'N'
-        decodedCustom['default-settings']['enable-audio'] = 'Y' if enableAudio else 'N'
-        decodedCustom['default-settings']['enable-tunnel'] = 'Y' if enableTCP else 'N'
-        decodedCustom['default-settings']['enable-remote-restart'] = 'Y' if enableRemoteRestart else 'N'
-        decodedCustom['default-settings']['enable-record-session'] = 'Y' if enableRecording else 'N'
-        decodedCustom['default-settings']['enable-block-input'] = 'Y' if enableBlockingInput else 'N'
-        decodedCustom['default-settings']['allow-remote-config-modification'] = 'Y' if enableRemoteModi else 'N'
-        decodedCustom['default-settings']['direct-server'] = 'Y' if enableDirectIP else 'N'
-        decodedCustom['default-settings']['verification-method'] = 'use-permanent-password' if hidecm else 'use-both-passwords'
-        decodedCustom['default-settings']['approve-mode'] = passApproveMode
-        decodedCustom['default-settings']['allow-hide-cm'] = 'Y' if hidecm else 'N'
-        decodedCustom['default-settings']['allow-remove-wallpaper'] = 'Y' if removeWallpaper else 'N'
-        decodedCustom['default-settings']['enable-remote-printer'] = 'Y' if enablePrinter else 'N'
-        decodedCustom['default-settings']['enable-camera'] = 'Y' if enableCamera else 'N'
-        decodedCustom['default-settings']['enable-terminal'] = 'Y' if enableTerminal else 'N'
-        
-
-    else:
-        decodedCustom['override-settings']['access-mode'] = permissionsType
-        decodedCustom['override-settings']['enable-keyboard'] = 'Y' if enableKeyboard else 'N'
-        decodedCustom['override-settings']['enable-clipboard'] = 'Y' if enableClipboard else 'N'
-        decodedCustom['override-settings']['enable-file-transfer'] = 'Y' if enableFileTransfer else 'N'
-        decodedCustom['override-settings']['enable-audio'] = 'Y' if enableAudio else 'N'
-        decodedCustom['override-settings']['enable-tunnel'] = 'Y' if enableTCP else 'N'
-        decodedCustom['override-settings']['enable-remote-restart'] = 'Y' if enableRemoteRestart else 'N'
-        decodedCustom['override-settings']['enable-record-session'] = 'Y' if enableRecording else 'N'
-        decodedCustom['override-settings']['enable-block-input'] = 'Y' if enableBlockingInput else 'N'
-        decodedCustom['override-settings']['allow-remote-config-modification'] = 'Y' if enableRemoteModi else 'N'
-        decodedCustom['override-settings']['direct-server'] = 'Y' if enableDirectIP else 'N'
-        decodedCustom['override-settings']['verification-method'] = 'use-permanent-password' if hidecm else 'use-both-passwords'
-        decodedCustom['override-settings']['approve-mode'] = passApproveMode
-        decodedCustom['override-settings']['allow-hide-cm'] = 'Y' if hidecm else 'N'
-        decodedCustom['override-settings']['allow-remove-wallpaper'] = 'Y' if removeWallpaper else 'N'
-        decodedCustom['override-settings']['enable-remote-printer'] = 'Y' if enablePrinter else 'N'
-        decodedCustom['override-settings']['enable-camera'] = 'Y' if enableCamera else 'N'
-        decodedCustom['override-settings']['enable-terminal'] = 'Y' if enableTerminal else 'N'
-        if direction == 'incoming':
-            decodedCustom['override-settings']['custom-rendezvous-server'] = server
-            decodedCustom['override-settings']['api-server'] = apiServer
-
-    if defaultManual:
-        for line in defaultManual.splitlines():
-            if '=' in line:
-                k, value = line.split('=', 1)
-                decodedCustom['default-settings'][k.strip()] = value.strip()
-
-    if overrideManual:
-        for line in overrideManual.splitlines():
-            if '=' in line:
-                k, value = line.split('=', 1)
-                decodedCustom['override-settings'][k.strip()] = value.strip()
-    
     decodedCustomJson = json.dumps(decodedCustom)
 
     string_bytes = decodedCustomJson.encode("ascii")
@@ -343,7 +251,7 @@ def generate_custom_client(params, full_url):
     try:
         response = requests.post(url, json=data, headers=headers)
         if response.status_code == 204 or response.status_code == 200:
-            github_data = response.json()
+            github_data = response.json() if response.content else {}
             print(github_data)
             new_github_run.github_run_id = github_data.get('workflow_run_id')
             new_github_run.status = "in_progress"

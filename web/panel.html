@@ -1,0 +1,24 @@
+<section class="github-panel" aria-labelledby="github-heading">
+  <div class="eyebrow">RDGEN · GITHUB EDITION</div>
+  <h2 id="github-heading">Your client. Your network.</h2>
+  <p dir="rtl" lang="fa">تنظیمات را وارد کنید، فایل JSON را ذخیره کنید و کلاینت ویندوز را بدون سرور در GitHub Actions بسازید. تنظیمات Network داخل خروجی اعمال می‌شوند.</p>
+  <p>This editor runs in your browser. Standalone builds currently support Windows 64-bit. Other platforms can export configurations for the Django service.</p>
+  <ol>
+    <li>Configure your server, public key and client options below.</li>
+    <li>Copy the build JSON, open GitHub Actions, choose <strong>Run workflow</strong> and paste it into <strong>config_json</strong>. Leave <strong>zip_url</strong> empty.</li>
+    <li>When the run completes, download <strong>windows-client</strong> from its Artifacts section.</li>
+  </ol>
+  <div class="github-actions">
+    <button type="button" id="copy-build">Copy build JSON</button>
+    <a id="actions-link" href="https://github.com/mahdinosrati/rdgen/actions/workflows/generator-windows.yml" target="_blank" rel="noopener">Open GitHub Actions ↗</a>
+  </div>
+  <details>
+    <summary>Start a build directly from this page</summary>
+    <p>Use a fine-grained GitHub token with Actions: read/write access to this repository. The token is sent only to api.github.com and is never saved or included in your configuration.</p>
+    <label for="github-token">GitHub token</label>
+    <input id="github-token" type="password" autocomplete="off" placeholder="github_pat_…">
+    <p>Workflow inputs and artifacts are accessible according to your repository permissions. Avoid putting a private permanent password in a public repository build.</p>
+  </details>
+  <p id="build-status" role="status" aria-live="polite">Ready · No build started</p>
+  <details><summary>Network values included in the build</summary><pre id="network-preview"></pre></details>
+</section>

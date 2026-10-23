@@ -6,11 +6,16 @@ on:
       version:
         description: 'version to buld'
         required: true
+        default: '1.5.0'
+        type: string
+      config_json:
+        description: 'Saved configuration JSON (standalone build, no server required)'
+        required: false
         default: ''
         type: string
       zip_url:
-        description: 'url to zip of json'
-        required: true
+        description: 'url to zip of json (legacy server mode)'
+        required: false
         default: ''
         type: string
       app_version:
@@ -31,7 +36,7 @@ env:
   ANDROID_FLUTTER_VERSION: "3.24.5" 
   # for arm64 linux because official Dart SDK does not work
   FLUTTER_ELINUX_VERSION: "3.16.9"
-  TAG_NAME: "${{ inputs.upload-tag }}"
+  TAG_NAME: "nightly"
   VCPKG_BINARY_SOURCES: "clear"
   # vcpkg version: 2024.07.12
   VCPKG_COMMIT_ID: "9e593bb18ea69cc5095e012465dcd675a822ed0d"
@@ -62,6 +67,7 @@ jobs:
     uses: ./.github/workflows/third-party-RustDeskTempTopMostWindow.yml
     with:
       rustdesk-version: ${{ inputs.version }}
+      config_json: ${{ inputs.config_json }}
       upload-artifact: true
       target: windows-2022
       configuration: Release
@@ -91,10 +97,23 @@ jobs:
             }
           # - { target: aarch64-pc-windows-msvc, os: windows-2022, arch: aarch64 }
     steps:
+      - name: Validate build inputs
+        shell: python
+        env:
+          INPUT_VERSION: ${{ inputs.version }}
+          INPUT_APP_VERSION: ${{ inputs.app_version }}
+        run: |
+          import os, re
+          if os.environ['INPUT_VERSION'] not in ('1.5.0', 'master'):
+              raise ValueError('Unsupported RustDesk version')
+          value = os.environ['INPUT_APP_VERSION']
+          if value and not re.fullmatch(r'[0-9]+\.[0-9]+\.[0-9]+(?:[-+][A-Za-z0-9.-]+)?', value):
+              raise ValueError('Invalid application version')
       - name: Checkout Repository
         uses: actions/checkout@v4
         
       - uses: actions/download-artifact@v4
+        if: inputs.config_json == ''
         with:
           name: encrypted-secrets-zip
 
@@ -102,9 +121,10 @@ jobs:
         uses: ./.github/actions/decrypt-secrets
         with:
           zip_password: ${{ secrets.ZIP_PASSWORD }}
+          config_json: ${{ inputs.config_json }}
 
       - name: Finalize and Cleanup zip/json
-        if: always() # Run even if previous steps fail
+        if: ${{ always() && inputs.config_json == '' }}
         continue-on-error: true
         uses: fjogeleit/http-request-action@v1
         with:
@@ -114,7 +134,7 @@ jobs:
           data: '{"uuid": "${{ env.uuid }}"}'
 
       - name: Export GitHub Actions cache environment variables
-        uses: actions/github-script@v6
+        uses: actions/github-script@v7
         with:
           script: |
             core.exportVariable('ACTIONS_CACHE_URL', process.env.ACTIONS_CACHE_URL || '');
@@ -260,55 +280,8 @@ jobs:
           sed -i -e 's|$downloadUrl/$downloadFile|${{ env.downloadLink }}|' ./flutter/lib/desktop/widgets/update_progress.dart
 
       - name: set server, serverPort, key, and apiserver
-        continue-on-error: true
         shell: bash
-        env:
-          SERVER_DOMAIN: ${{ env.server }}
-          SERVER_PORT_INPUT: ${{ env.serverPort }}
-          SERVER_KEY: ${{ env.key }}
-          API_SERVER: ${{ env.apiServer }}
-        run: |
-          # Pass secrets via bash env vars to avoid quoting issues
-          if [ ! -f "./libs/hbb_common/src/config.rs" ]; then
-            echo "Error: config.rs not found!"
-            exit 1
-          fi
-          if [ ! -f "./src/common.rs" ]; then
-            echo "Error: common.rs not found!"
-            exit 1
-          fi
-
-          # Port must be a number; views.py defaults it to 21116
-          if ! [[ "$SERVER_PORT_INPUT" =~ ^[0-9]+$ ]]; then
-            echo "Error: serverPort must be a number, got: '$SERVER_PORT_INPUT'"
-            exit 1
-          fi
-
-          # Derive the port block from the rendezvous port
-          # (defaults 21116/21117/21118/21119)
-          SERVER_PORT=$SERVER_PORT_INPUT
-          RELAY_PORT=$((SERVER_PORT + 1))
-          WS_RENDEZVOUS_PORT=$((RELAY_PORT + 1))
-          WS_RELAY_PORT=$((WS_RENDEZVOUS_PORT + 1))
-
-          echo "Setting server: $SERVER_DOMAIN"
-          echo "Setting ports: $SERVER_PORT, $RELAY_PORT, $WS_RENDEZVOUS_PORT, $WS_RELAY_PORT"
-
-          sed -i -e "s|rs-ny.rustdesk.com|$SERVER_DOMAIN|" ./libs/hbb_common/src/config.rs
-
-          # Match on numeric value so the step is independent of defaults
-          sed -i -e "s|pub const RENDEZVOUS_PORT: i32 = [0-9][0-9]*;|pub const RENDEZVOUS_PORT: i32 = $SERVER_PORT;|" ./libs/hbb_common/src/config.rs
-          sed -i -e "s|pub const RELAY_PORT: i32 = [0-9][0-9]*;|pub const RELAY_PORT: i32 = $RELAY_PORT;|" ./libs/hbb_common/src/config.rs
-          sed -i -e "s|pub const WS_RENDEZVOUS_PORT: i32 = [0-9][0-9]*;|pub const WS_RENDEZVOUS_PORT: i32 = $WS_RENDEZVOUS_PORT;|" ./libs/hbb_common/src/config.rs
-          sed -i -e "s|pub const WS_RELAY_PORT: i32 = [0-9][0-9]*;|pub const WS_RELAY_PORT: i32 = $WS_RELAY_PORT;|" ./libs/hbb_common/src/config.rs
-
-          sed -i -e "s|OeVuKk5nlHiXp+APNn0Y3pC1Iwpwn44JGqrQCsWqmBw=|$SERVER_KEY|" ./libs/hbb_common/src/config.rs
-          sed -i -e "s|https://admin.rustdesk.com|$API_SERVER|" ./src/common.rs
-
-          echo "=== Verification ==="
-          grep -nE "RENDEZVOUS_PORT|RELAY_PORT|WS_" ./libs/hbb_common/src/config.rs
-          # ./flutter/pubspec.yaml
-          #sed -i '/intl:/a \ \ archive: ^3.6.1' ./flutter/pubspec.yaml
+        run: python "$NETWORK_PATCH"
 
       - name: allow custom.txt
         uses: nick-fields/retry@v3
@@ -464,7 +437,11 @@ jobs:
           retry_wait_seconds: 15
           shell: pwsh
           command: |
-            Invoke-WebRequest -Uri ${{ env.iconlink_url }}/get_png?filename=${{ env.iconlink_file }}"&"uuid=${{ env.iconlink_uuid }} -OutFile ./res/iconx.png 
+            if ($env:iconlink_url -eq 'local') {
+              Copy-Item "$env:RUNNER_TEMP/rdgen-images/icon.png" ./res/iconx.png
+            } else {
+              Invoke-WebRequest -Uri ${{ env.iconlink_url }}/get_png?filename=${{ env.iconlink_file }}"&"uuid=${{ env.iconlink_uuid }} -OutFile ./res/iconx.png
+            }
             mv ./res/icon.ico ./res/icon.ico.bak
             mv ./res/icon.png ./res/icon.png.bak
             mv ./res/tray-icon.ico ./res/tray-icon.ico.bak
@@ -556,8 +533,8 @@ jobs:
       - name: Checkout printer-adapter crate
         uses: actions/checkout@v4
         with:
-          repository: bryangerlach/rdgen
-          ref: master
+          repository: ${{ github.repository }}
+          ref: ${{ github.sha }}
           path: ./temp-repo
 
       - name: Move printer-adapter into place
@@ -632,7 +609,11 @@ jobs:
           shell: pwsh
           continue_on_error: true
           command: |
-            Invoke-WebRequest -Uri ${{ env.logolink_url }}/get_png?filename=${{ env.logolink_file }}"&"uuid=${{ env.logolink_uuid }} -OutFile ./rustdesk/data/flutter_assets/assets/logo.png
+            if ($env:logolink_url -eq 'local') {
+              Copy-Item "$env:RUNNER_TEMP/rdgen-images/logo.png" ./rustdesk/data/flutter_assets/assets/logo.png
+            } else {
+              Invoke-WebRequest -Uri ${{ env.logolink_url }}/get_png?filename=${{ env.logolink_file }}"&"uuid=${{ env.logolink_uuid }} -OutFile ./rustdesk/data/flutter_assets/assets/logo.png
+            }
 
       - name: find Runner.res
         # Windows: find Runner.res (compiled from ./flutter/windows/runner/Runner.rc), copy to ./Runner.res
@@ -755,6 +736,16 @@ jobs:
         run: |
           mv ./SignOutput/rustdesk.msi "./SignOutput/${{ env.filename }}.msi" || echo "rustdesk"
 
+      - name: Upload Windows clients
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-client-${{ github.run_number }}
+          path: |
+            SignOutput/*.exe
+            SignOutput/*.msi
+          if-no-files-found: error
+          retention-days: 7
+
       - name: send file to rdgen server
         if: ${{ env.rdgen == 'true' }}
         uses: nick-fields/retry@v3
@@ -783,7 +774,7 @@ jobs:
     needs: [build-for-windows-flutter]
     runs-on: ubuntu-latest
     continue-on-error: true
-    if: always()
+    if: ${{ always() && inputs.config_json == '' }}
     steps:
       - name: Delete secrets artifact
         uses: geekyeggo/delete-artifact@v5

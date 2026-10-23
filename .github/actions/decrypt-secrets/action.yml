@@ -1,6 +1,10 @@
 name: 'Decrypt and Mask Secrets'
 description: 'Decrypts a zip and masks the JSON contents as env vars'
 inputs:
+  config_json:
+    description: 'Saved config for a standalone build (no Django server)'
+    required: false
+    default: ''
   zip_password:
     description: 'Password for the Zip'
     required: true
@@ -12,11 +16,27 @@ inputs:
 runs:
   using: "composite"
   steps:
+    - name: Preserve build helpers
+      shell: python
+      run: |
+        import os, pathlib, shutil
+        target = pathlib.Path(os.environ['RUNNER_TEMP']) / 'rdgen-tools'
+        shutil.copytree('.github/scripts', target, dirs_exist_ok=True)
+        with open(os.environ['GITHUB_ENV'], 'a', encoding='utf-8') as f:
+            f.write('NETWORK_PATCH=' + str(target / 'patch_network.py') + '\n')
+    - name: Load standalone configuration
+      if: inputs.config_json != ''
+      shell: bash
+      env:
+        RDGEN_CONFIG: ${{ inputs.config_json }}
+      run: python .github/scripts/serverless_config.py
     - name: install python deps
+      if: inputs.config_json == ''
       shell: bash
       run: |
         pip install pyzipper
     - name: Decrypt and Mask
+      if: inputs.config_json == ''
       shell: python
       env:
         PYTHONUTF8: "1"
