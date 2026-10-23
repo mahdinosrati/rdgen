@@ -2,6 +2,7 @@ import re
 
 from django import forms
 from PIL import Image
+from .network import normalize_network
 
 # App/company names are interpolated into single/double-quoted bash sed
 # scripts in every generator workflow: & \ | corrupt the substitution
@@ -132,3 +133,11 @@ class GenerateForm(forms.Form):
 
     def clean_compname(self):
         return self._reject_unsafe_name_chars('compname')
+
+    def clean(self):
+        cleaned = super().clean()
+        try:
+            normalize_network(cleaned)
+        except ValueError as exc:
+            raise forms.ValidationError(str(exc))
+        return cleaned

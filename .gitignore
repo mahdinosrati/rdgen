@@ -5,3 +5,5 @@ gunicorn.conf
 *.zip
 *.png
 *.zip
+dist/
+__pycache__/

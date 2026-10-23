@@ -225,6 +225,7 @@
 </head>
 <body>
     <h1><i class="fas fa-cogs"></i> RustDesk Custom Client Builder</h1>
+    {% if form.errors %}<div role="alert">{{ form.errors }}</div>{% endif %}
     <form id="myForm" action="/generator" method="post" enctype="multipart/form-data">
         <div class="save-load-section-container">
             <div class="section">
@@ -408,6 +409,9 @@
         </div>
     </form>
     <script>
+        document.getElementById('myForm').addEventListener('submit', () => {
+            document.querySelectorAll('#myForm input[type=checkbox]:disabled').forEach(input => input.disabled = false);
+        });
         document.querySelectorAll('.platform-icon').forEach(icon => {
             icon.addEventListener('click', function() {
                 document.querySelectorAll('.platform-icon').forEach(i => i.classList.remove('active'));
@@ -474,7 +478,7 @@
                 enableRemoteModi.disabled = true;
                 enablePrinter.disabled = true;
                 enableCamera.disabled = true;
-                enableTerminal.disable = true;
+                enableTerminal.disabled = true;
             } else if (this.value === 'view') {
                 enableKeyboard.checked = false;
                 enableClipboard.checked = false;
@@ -500,7 +504,7 @@
                 enableRemoteModi.disabled = true;
                 enablePrinter.disabled = true;
                 enableCamera.disabled = true;
-                enableTerminal.disable = true;
+                enableTerminal.disabled = true;
             } else if (this.value === 'custom') {
                 enableKeyboard.disabled = false;
                 enableClipboard.disabled = false;
@@ -511,9 +515,9 @@
                 enableRecording.disabled = false;
                 enableBlockingInput.disabled = false;
                 enableRemoteModi.disabled = false;
-                enablePrinter.checked = false;
-                enableCamera.checked = false;
-                enableTerminal.checked = false;
+                enablePrinter.disabled = false;
+                enableCamera.disabled = false;
+                enableTerminal.disabled = false;
             }
         });
         function previewImage(input, previewContainerId) {
@@ -545,7 +549,7 @@
             icon.classList.toggle("fa-chevron-up");
         });
 
-        async function saveFormData() {
+        async function saveFormData(download = true) {
             const filename = document.getElementById("{{ form.exename.id_for_label }}").value;
             if (!filename) {
                 document.getElementById("filenameError").textContent = "Filename is required.";
@@ -625,6 +629,7 @@
                 }
             }
 
+            if (!download) return formData;
             const jsonData = JSON.stringify(formData, null, 2);
             const blob = new Blob([jsonData], { type: "application/json" });
             const url = URL.createObjectURL(blob);
@@ -675,18 +680,19 @@
             const fileInput = document.getElementById("fileInput");
             fileInput.click();
 
-            fileInput.addEventListener("change", (event) => {
+            fileInput.onchange = (event) => {
                 const file = event.target.files[0];
                 if (file) {
                     const reader = new FileReader();
                     reader.onload = (e) => {
                         try {
                             const formData = JSON.parse(e.target.result);
+                            if (!formData || Array.isArray(formData) || typeof formData !== 'object') throw new Error('Expected a configuration object');
                             carriedUnknownFields = {};
                             const skippedKeys = [];
                             for (const key in formData) {
                                 // More robust selector: checks for name OR id
-                                const elements = document.querySelectorAll(`[name="${key}"], [id="${key}"]`);
+                                const elements = document.querySelectorAll(`[name="${CSS.escape(key)}"], [id="${CSS.escape(key)}"]`);
 
                                 if (elements.length > 0) { // Check if any element(s) exist
                                     elements.forEach(element => { // Loop through all matching elements (important for radios)
@@ -708,23 +714,35 @@
                                                 element.checked = false; // Uncheck others in the group
                                             }
                                         } else if (element.type === 'checkbox') {
-                                            element.checked = formData[key];
+                                            element.checked = [true, 'true', 'on', 1, '1'].includes(formData[key]);
                                         } else if (element.type !== 'file') {
                                             element.value = formData[key];
                                         }
 
                                         // Handle image previews (as before)
                                         if (key === 'iconfile' && formData[key]) {
+                                            if (!/^data:image\/png;base64,[A-Za-z0-9+/=\s]+$/.test(formData[key])) throw new Error('Invalid PNG image');
                                             document.getElementById('id_iconbase64').value = formData[key];
-                                            document.getElementById('icon-preview').innerHTML = `<img src="${formData[key]}" style="max-width: 300px; max-height: 60px;">`;
+                                            const image = document.createElement('img');
+                                            image.src = formData[key];
+                                            image.style.cssText = 'max-width:300px;max-height:60px';
+                                            document.getElementById('icon-preview').replaceChildren(image);
                                         }
                                         if (key === 'logofile' && formData[key]) {
+                                            if (!/^data:image\/png;base64,[A-Za-z0-9+/=\s]+$/.test(formData[key])) throw new Error('Invalid PNG image');
                                             document.getElementById('id_logobase64').value = formData[key];
-                                            document.getElementById('logo-preview').innerHTML = `<img src="${formData[key]}" style="max-width: 300px; max-height: 60px;">`;
+                                            const image = document.createElement('img');
+                                            image.src = formData[key];
+                                            image.style.cssText = 'max-width:300px;max-height:60px';
+                                            document.getElementById('logo-preview').replaceChildren(image);
                                         }
                                         if (key === 'privacyfile' && formData[key]) {
+                                            if (!/^data:image\/png;base64,[A-Za-z0-9+/=\s]+$/.test(formData[key])) throw new Error('Invalid PNG image');
                                             document.getElementById('id_privacybase64').value = formData[key];
-                                            document.getElementById('privacy-preview').innerHTML = `<img src="${formData[key]}" style="max-width: 300px; max-height: 60px;">`;
+                                            const image = document.createElement('img');
+                                            image.src = formData[key];
+                                            image.style.cssText = 'max-width:300px;max-height:60px';
+                                            document.getElementById('privacy-preview').replaceChildren(image);
                                         }
                                     });
                                 } else {
@@ -737,13 +755,14 @@
                                 }
                             }
                             showLoadWarnings(skippedKeys);
+                            document.getElementById('myForm').dispatchEvent(new Event('input', {bubbles: true}));
                         } catch (error) {
                             alert("Error loading data. Invalid JSON file.");
                         }
                     };
                     reader.readAsText(file);
                 }
-            });
+            };
         }
     </script>
 </body>

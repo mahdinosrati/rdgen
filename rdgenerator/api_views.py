@@ -1,6 +1,7 @@
 import json
 import os
 import re
+from .network import normalize_network
 from django.http import JsonResponse
 from django.conf import settings as _settings
 from .views import generate_custom_client, _get_run_status, _UUID_RE
@@ -46,6 +47,8 @@ def validate_generate_params(data):
         tuple: (cleaned_data dict, errors dict)
         If errors is non-empty, validation failed.
     """
+    if not isinstance(data, dict):
+        return {}, {'body': 'Must be a JSON object.'}
     errors = {}
     cleaned = {}
 
@@ -107,6 +110,10 @@ def validate_generate_params(data):
     cleaned['logofile'] = None
     cleaned['privacyfile'] = None
 
+    try:
+        normalize_network(cleaned)
+    except ValueError as exc:
+        errors['network'] = str(exc)
     return cleaned, errors
 
 
@@ -126,6 +133,9 @@ def api_generate(request):
         data = json.loads(request.body)
     except (json.JSONDecodeError, ValueError) as e:
         return JsonResponse({"success": False, "error": f"Invalid JSON: {str(e)}"}, status=400)
+
+    if not isinstance(data, dict):
+        return JsonResponse({'success': False, 'error': 'Must be a JSON object.'}, status=400)
 
     # Optional platform override: allows the caller to overwrite the
     # "platform" key carried in the JSON body (e.g. when the saved config
