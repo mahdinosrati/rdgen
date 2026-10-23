@@ -1,4 +1,11 @@
 :root { color-scheme: dark; }
+* { box-sizing: border-box; }
+.container { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.section { min-width: 0; overflow-wrap: anywhere; }
+.section input[type=file], .section img { max-width: 100%; }
+.save-load-section-container { position: static; max-width: 1160px; margin: 0 auto 20px; }
+.save-load-section { display: flex; gap: 12px; flex-wrap: wrap; }
+#saveLoadTitle { cursor: pointer; }
 body { max-width: 1440px; margin: auto; padding: 24px; font-family: system-ui, sans-serif; background: #101820; color: #e4edf5; }
 h1 { font-size: clamp(24px, 4vw, 38px); }
 .github-panel { max-width: 1000px; margin: 24px auto 32px; padding: clamp(20px, 4vw, 40px); border: 1px solid #395463; border-radius: 16px; background: linear-gradient(120deg,#19323a,#15222e); line-height: 1.65; }
@@ -14,4 +21,4 @@ h1 { font-size: clamp(24px, 4vw, 38px); }
 #network-preview { white-space: pre-wrap; overflow-wrap: anywhere; }
 button { cursor: pointer; }
 button:disabled { opacity: .5; cursor: wait; }
-@media(max-width: 640px) { body { padding: 12px; } .container { flex-direction: column; } .section { min-width: 0; } }
+@media(max-width: 640px) { body { padding: 12px; } .container { grid-template-columns: minmax(0, 1fr); padding: 0; } .platform { padding: 16px 0; } }

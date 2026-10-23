@@ -262,7 +262,7 @@ def generate_custom_client(params, full_url):
                 "uuid": myuuid,
                 "filename": filename,
                 "platform": platform,
-                "log_url": github_data.get('html_url')
+                "log_url": github_data.get('html_url') or f'https://github.com/{_settings.GHUSER}/{_settings.REPONAME}/actions'
             }
         else:
             return {
@@ -294,9 +294,11 @@ def _get_run_status(uuid_val):
     except GithubRun.DoesNotExist:
         return {"found": False}
 
-    github_log_url = f"https://github.com/{_settings.GHUSER}/{_settings.REPONAME}/actions/runs/{gh_run.github_run_id}"
+    github_log_url = f"https://github.com/{_settings.GHUSER}/{_settings.REPONAME}/actions"
+    if gh_run.github_run_id:
+        github_log_url += f"/runs/{gh_run.github_run_id}"
 
-    if gh_run.status not in ['success', 'failure', 'cancelled', 'timed_out', 'skipped']:
+    if gh_run.github_run_id and gh_run.status not in ['success', 'failure', 'cancelled', 'timed_out', 'skipped']:
         headers = {
             "Authorization": f"Bearer {_settings.GHBEARER}",
             "Accept": "application/vnd.github+json"
