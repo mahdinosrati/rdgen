@@ -538,7 +538,7 @@
         const saveLoadSection = document.querySelector(".save-load-section");
 
         saveLoadTitle.addEventListener("click", () => {
-            if (!saveLoadSection.style.display || saveLoadSection.style.display === "none") {
+            if (getComputedStyle(saveLoadSection).display === "none") {
                 saveLoadSection.style.display = "block";
             } else {
                 saveLoadSection.style.display = "none";

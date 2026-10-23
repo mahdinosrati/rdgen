@@ -1,5 +1,6 @@
 """Render the existing Django form as a GitHub Pages configuration editor."""
 import os
+import hashlib
 from pathlib import Path
 import shutil
 import sys
@@ -20,8 +21,10 @@ panel = (ROOT / 'web/panel.html').read_text(encoding='utf-8')
 html = html.replace('</h1>', '</h1>' + panel, 1)
 html = html.replace('action="/generator"', 'action="#"')
 html = html.replace('https://github.com/bryangerlach/rdgen', 'https://github.com/mahdinosrati/rdgen')
-html = html.replace('</head>', '<link rel="stylesheet" href="pages.css"></head>')
-html = html.replace('</body>', '<script src="pages.js"></script></body>')
+css_version = hashlib.sha256((ROOT / 'web/pages.css').read_bytes()).hexdigest()[:12]
+js_version = hashlib.sha256((ROOT / 'web/pages.js').read_bytes()).hexdigest()[:12]
+html = html.replace('</head>', f'<link rel="stylesheet" href="pages.css?v={css_version}"></head>')
+html = html.replace('</body>', f'<script src="pages.js?v={js_version}"></script></body>')
 (target / 'index.html').write_text(html, encoding='utf-8')
 (target / '.nojekyll').touch()
 for name in ('pages.js', 'pages.css'):
