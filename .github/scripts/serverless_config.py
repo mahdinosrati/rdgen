@@ -65,7 +65,7 @@ def prepare(data):
     for field in ('delayFix', 'xOffline', 'removeNewVersionNotif'):
         env[field] = 'true' if data.get(field, field == 'delayFix') else 'false'
     for kind in ('icon', 'logo', 'privacy'):
-        value = data.get(kind + 'base64') or data.get(kind + 'file')
+        value = data.get(kind + 'file') or data.get(kind + 'base64')
         if value:
             if not isinstance(value, str) or not value.startswith('data:image/png;base64,'):
                 raise ValueError(f'{kind} must be a PNG data URL')
@@ -83,8 +83,7 @@ def prepare(data):
     return env
 
 
-if __name__ == '__main__':
-    env = prepare(json.loads(os.environ['RDGEN_CONFIG']))
+def export_env(env):
     with open(os.environ['GITHUB_ENV'], 'a', encoding='utf-8') as output:
         for key, value in env.items():
             if '\n' in value or '\r' in value:
@@ -93,3 +92,7 @@ if __name__ == '__main__':
                 print('::add-mask::' + value.replace('%', '%25'))
             output.write(f'{key}={value}\n')
     print('Configuration validated and loaded.')
+
+
+if __name__ == '__main__':
+    export_env(prepare(json.loads(os.environ['RDGEN_CONFIG'])))

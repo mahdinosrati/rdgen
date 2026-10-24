@@ -18,7 +18,7 @@ jobs:
         with:
           python-version: '3.12'
           cache: pip
-      - run: pip install -r requirements.txt brotli
+      - run: pip install -r requirements.txt brotli cryptography
       - run: python manage.py test
       - run: python -m unittest discover -s scripts/tests -v
       - run: python scripts/build_pages.py

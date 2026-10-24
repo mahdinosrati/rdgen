@@ -1,6 +1,14 @@
 name: 'Decrypt and Mask Secrets'
 description: 'Decrypts a zip and masks the JSON contents as env vars'
 inputs:
+  config_ref:
+    description: 'Temporary branch containing an encrypted configuration'
+    required: false
+    default: ''
+  private_key:
+    description: 'Private decryption key from the repository Actions secret'
+    required: false
+    default: ''
   config_json:
     description: 'Saved config for a standalone build (no Django server)'
     required: false
@@ -16,6 +24,30 @@ inputs:
 runs:
   using: "composite"
   steps:
+    - name: Validate encrypted input branch
+      if: inputs.config_ref != ''
+      shell: python
+      env:
+        CONFIG_REF: ${{ inputs.config_ref }}
+      run: |
+        import os, re
+        if not re.fullmatch(r'rdgen-inputs/[0-9a-f-]{36}', os.environ['CONFIG_REF']):
+            raise ValueError('Invalid encrypted input branch')
+    - uses: actions/checkout@v4
+      if: inputs.config_ref != ''
+      with:
+        ref: ${{ inputs.config_ref }}
+        path: .rdgen-payload
+        sparse-checkout: .rdgen-inputs
+        persist-credentials: false
+    - name: Decrypt uploaded configuration
+      if: inputs.config_ref != ''
+      shell: bash
+      env:
+        RDGEN_PRIVATE_KEY: ${{ inputs.private_key }}
+      run: |
+        python -m pip install cryptography
+        python .github/scripts/decrypt_payload.py
     - name: Preserve build helpers
       shell: python
       run: |
@@ -26,18 +58,18 @@ runs:
             f.write('NETWORK_PATCH=' + str(target / 'patch_network.py') + '\n')
             f.write('PACKAGE_VERIFIER=' + str(target / 'verify_windows_package.py') + '\n')
     - name: Load standalone configuration
-      if: inputs.config_json != ''
+      if: inputs.config_json != '' && inputs.config_ref == ''
       shell: bash
       env:
         RDGEN_CONFIG: ${{ inputs.config_json }}
       run: python .github/scripts/serverless_config.py
     - name: install python deps
-      if: inputs.config_json == ''
+      if: inputs.config_json == '' && inputs.config_ref == ''
       shell: bash
       run: |
         pip install pyzipper
     - name: Decrypt and Mask
-      if: inputs.config_json == ''
+      if: inputs.config_json == '' && inputs.config_ref == ''
       shell: python
       env:
         PYTHONUTF8: "1"

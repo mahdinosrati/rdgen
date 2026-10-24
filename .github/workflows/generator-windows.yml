@@ -3,6 +3,11 @@ run-name: Custom Windows Client Generator
 on: 
   workflow_dispatch:
     inputs:
+      config_ref:
+        description: 'Encrypted configuration branch (set by the web editor)'
+        required: false
+        default: ''
+        type: string
       version:
         description: 'version to buld'
         required: true
@@ -68,6 +73,7 @@ jobs:
     with:
       rustdesk-version: ${{ inputs.version }}
       config_json: ${{ inputs.config_json }}
+      config_ref: ${{ inputs.config_ref }}
       upload-artifact: true
       target: windows-2022
       configuration: Release
@@ -113,7 +119,7 @@ jobs:
         uses: actions/checkout@v4
         
       - uses: actions/download-artifact@v4
-        if: inputs.config_json == ''
+        if: inputs.config_json == '' && inputs.config_ref == ''
         with:
           name: encrypted-secrets-zip
 
@@ -122,9 +128,11 @@ jobs:
         with:
           zip_password: ${{ secrets.ZIP_PASSWORD }}
           config_json: ${{ inputs.config_json }}
+          config_ref: ${{ inputs.config_ref }}
+          private_key: ${{ secrets.RDGEN_PRIVATE_KEY }}
 
       - name: Finalize and Cleanup zip/json
-        if: ${{ always() && inputs.config_json == '' }}
+        if: ${{ always() && inputs.config_json == '' && inputs.config_ref == '' }}
         continue-on-error: true
         uses: fjogeleit/http-request-action@v1
         with:
@@ -781,9 +789,25 @@ jobs:
     needs: [build-for-windows-flutter]
     runs-on: ubuntu-latest
     continue-on-error: true
-    if: ${{ always() && inputs.config_json == '' }}
+    if: ${{ always() && inputs.config_json == '' && inputs.config_ref == '' }}
     steps:
       - name: Delete secrets artifact
         uses: geekyeggo/delete-artifact@v5
         with:
           name: encrypted-secrets-zip
+
+  cleanup-encrypted-input:
+    needs: [build-for-windows-flutter, build-RustDeskTempTopMostWindow]
+    if: ${{ always() && inputs.config_ref != '' }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/github-script@v7
+        env:
+          CONFIG_REF: ${{ inputs.config_ref }}
+        with:
+          script: |
+            const ref = process.env.CONFIG_REF;
+            if (!/^rdgen-inputs\/[0-9a-f-]{36}$/.test(ref)) throw new Error('Invalid input branch');
+            await github.rest.git.deleteRef({...context.repo, ref: `heads/${ref}`});

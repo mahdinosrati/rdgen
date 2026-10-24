@@ -10,9 +10,13 @@ on:
         description: 'Windows artifact name'
         required: true
         type: string
+      config_ref:
+        description: 'Temporary branch containing encrypted expected configuration'
+        required: false
+        type: string
       config_json:
         description: 'Original saved configuration JSON to compare against the EXE'
-        required: true
+        required: false
         type: string
 permissions:
   contents: read
@@ -29,6 +33,8 @@ jobs:
       - name: Load expected configuration
         uses: ./.github/actions/decrypt-secrets
         with:
+          config_ref: ${{ inputs.config_ref }}
+          private_key: ${{ secrets.RDGEN_PRIVATE_KEY }}
           config_json: ${{ inputs.config_json }}
           zip_password: ''
       - uses: actions/download-artifact@v4
@@ -70,3 +76,19 @@ jobs:
         with:
           name: windows-package-verification
           path: client/verification*.json
+
+  cleanup-encrypted-input:
+    needs: verify
+    if: always() && inputs.config_ref != ''
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/github-script@v7
+        env:
+          CONFIG_REF: ${{ inputs.config_ref }}
+        with:
+          script: |
+            const ref = process.env.CONFIG_REF;
+            if (!/^rdgen-inputs\/[0-9a-f-]{36}$/.test(ref)) throw new Error('Invalid input branch');
+            await github.rest.git.deleteRef({...context.repo, ref: `heads/${ref}`});

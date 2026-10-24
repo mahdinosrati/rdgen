@@ -10,12 +10,21 @@ No Django server is required for Windows 64-bit builds:
 3. Choose **Run workflow**, paste the JSON into `config_json`, and leave `zip_url` empty.
 4. Download `windows-client-…` from the completed run's **Artifacts** section.
 
-You can also submit directly from the page using a fine-grained GitHub token with
-Actions read/write permission on this repository. The editor never saves the token
-or includes it in configuration exports. Large PNGs may exceed GitHub's workflow
-input limit; the page checks the size before submission. Workflow inputs and
-artifacts follow repository visibility, so avoid private passwords in public builds.
+For large configurations, use **Generate Custom Client** with a fine-grained
+GitHub token granting **Actions and Contents read/write** on this repository.
+The editor removes duplicate image fields and encrypts the configuration and
+original PNGs with AES-256-GCM, wrapping its random key with the repository's
+RSA-OAEP public key. Only an encrypted payload goes into a temporary
+`rdgen-inputs/…` branch; Actions decrypts it using `RDGEN_PRIVATE_KEY` and deletes
+the branch after the build. Configurations up to 15 MB are accepted without
+resizing images. The token is never saved or included in configuration exports.
+Small configurations can still use the manual `config_json` workflow input.
+Downloaded clients necessarily contain their preset password, so avoid private
+passwords in public builds even though the upload itself is encrypted.
 Other platforms still use the Django service described below.
+
+Fork maintainers must provision their own `RDGEN_PRIVATE_KEY` Actions secret and
+matching public JWK in `web/build-key.json` before using encrypted uploads.
 
 ### Network behavior
 
