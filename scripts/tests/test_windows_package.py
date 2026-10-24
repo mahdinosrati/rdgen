@@ -13,9 +13,13 @@ verifier = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(verifier)
 
 
-def payload(config, loader=b'client uses custom_.txt', corrupt=False):
+def payload(config, loader=b'client uses custom_.txt', corrupt=False, flutter=False):
     result = b'MZ stub rustdesk unrelated bytes\x00rustdesk'
-    for name, data in ((b'./custom_.txt', base64.b64encode(json.dumps(config).encode())), (b'./client.exe', loader)):
+    entries = [(b'./custom_.txt', base64.b64encode(json.dumps(config).encode())),
+               (b'./client.exe', b'C++ Flutter launcher' if flutter else loader)]
+    if flutter:
+        entries.append((b'./librustdesk.dll', loader))
+    for name, data in entries:
         compressed = brotli.compress(data)
         digest = b'0' * 32 if corrupt else hashlib.md5(data).hexdigest().encode()
         result += len(name).to_bytes(4, 'big') + name + len(compressed).to_bytes(4, 'big') + compressed + digest
@@ -36,6 +40,9 @@ class PackageTests(unittest.TestCase):
     def test_wrong_config_is_rejected(self):
         with self.assertRaisesRegex(ValueError, 'differs'):
             self.check(payload({'key': 'wrong'}), {'key': 'expected'})
+
+    def test_flutter_loader_is_in_dll(self):
+        self.assertEqual(self.check(payload({}, flutter=True), {})['loader_file'], 'librustdesk.dll')
 
     def test_unpatched_loader_is_rejected(self):
         with self.assertRaisesRegex(ValueError, 'does not reference'):

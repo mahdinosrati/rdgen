@@ -66,12 +66,14 @@ def verify(path, expected_config):
     config = json.loads(base64.b64decode(unpack_entry(files['custom_.txt']), validate=True))
     if config != expected_config:
         raise ValueError('Packaged custom_.txt differs from the requested configuration')
-    # The embedded executable must load the same file that we ship beside it.
-    client = next(name for name in files if '/' not in name and name.endswith('.exe'))
+    # Flutter's EXE is a C++ launcher; the Rust config loader lives in its DLL.
+    # Legacy Sciter builds contain the loader directly in the executable.
+    client = 'librustdesk.dll' if 'librustdesk.dll' in files else next(
+        name for name in files if '/' not in name and name.endswith('.exe'))
     if b'custom_.txt' not in unpack_entry(files[client]):
         raise ValueError('Packaged client does not reference custom_.txt')
     return {'filename': Path(path).name, 'embedded_files': len(files),
-            'configuration_matches': True, 'loader_matches': True,
+            'configuration_matches': True, 'loader_matches': True, 'loader_file': client,
             'sha256': hashlib.sha256(Path(path).read_bytes()).hexdigest()}
 
 
