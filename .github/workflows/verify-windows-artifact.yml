@@ -39,7 +39,34 @@ jobs:
           path: client
       - name: Verify the actual executable payload
         run: python .github/scripts/verify_windows_package.py client
+      - name: Install MSI extraction tools
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y msitools
+      - name: Verify MSI configuration without installing it
+        shell: python
+        run: |
+          import base64, hashlib, json, os, pathlib, subprocess, tempfile
+          expected = json.loads(base64.b64decode(os.environ['custom']))
+          installers = list(pathlib.Path('client').glob('*.msi'))
+          if not installers:
+              raise ValueError('No MSI installer was published')
+          reports = []
+          for installer in installers:
+              with tempfile.TemporaryDirectory() as folder:
+                  subprocess.run(['msiextract', '-C', folder, str(installer)], check=True, capture_output=True)
+                  configs = list(pathlib.Path(folder).rglob('custom_.txt'))
+                  if not configs:
+                      raise ValueError('MSI is missing custom_.txt')
+                  for config in configs:
+                      actual = json.loads(base64.b64decode(config.read_bytes(), validate=True))
+                      if actual != expected:
+                          raise ValueError('MSI configuration differs from the requested configuration')
+                  reports.append({'filename': installer.name, 'configuration_matches': True,
+                                  'sha256': hashlib.sha256(installer.read_bytes()).hexdigest()})
+          pathlib.Path('client/verification-msi.json').write_text(json.dumps(reports, indent=2))
+          print('Verified configuration inside every published MSI installer.')
       - uses: actions/upload-artifact@v4
         with:
           name: windows-package-verification
-          path: client/verification.json
+          path: client/verification*.json
