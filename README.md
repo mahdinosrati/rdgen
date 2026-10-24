@@ -5,15 +5,17 @@
 Open [the configuration editor](https://mahdinosrati.github.io/rdgen/).
 No Django server is required for Windows 64-bit builds:
 
-1. Fill in the client options, Host, Relay Server, port and public key.
-2. Click **Generate Custom Client** to download encrypted `payload.json`.
-3. Click **Upload to GitHub**, upload that file and commit directly to `master`.
-4. The upload workflow starts the Windows build automatically. Download
-   `windows-client-…` from the completed generator run's **Artifacts** section.
+1. Enter a fine-grained GitHub token for this repository with Actions and
+   Contents read/write access. It stays only in the current page until reload
+   or close; it is not saved in browser storage or configuration exports.
+2. Fill in Host, Relay Server, public key and client options.
+3. Click **Generate Custom Client** to start a build directly.
+4. Download `windows-client-…` from the completed run's Artifacts section.
 
-No personal access token is required. Sign in to GitHub with write access to
-this repository to upload the file. GitHub Pages cannot authorize builds by
-itself; the GitHub upload/commit is the authorization step.
+The optional **Download encrypted file** button supports token-free manual
+upload: upload the downloaded `payload.json` using **Upload to GitHub** and
+commit directly to master to trigger a build. This requires a GitHub account
+with write access to the repository.
 
 The editor removes duplicate image fields and encrypts the configuration and
 original PNGs with AES-256-GCM, wrapping its random key with the repository's

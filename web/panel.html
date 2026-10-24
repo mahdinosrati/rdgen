@@ -1,14 +1,16 @@
 <section class="github-panel" aria-labelledby="github-heading">
   <div class="eyebrow">RDGEN · GITHUB EDITION</div>
   <h2 id="github-heading">Your client. Your network.</h2>
-  <p dir="rtl" lang="fa">بدون توکن: تنظیمات را وارد کنید و Generate را بزنید. فایل رمزگذاری‌شدهٔ payload.json دانلود می‌شود. آن را در GitHub آپلود و روی شاخهٔ master ثبت کنید تا ساخت خودکار شروع شود.</p>
-  <p>Windows 64-bit builds. Sign in to GitHub with write access to this repository. No personal access token is needed.</p>
-  <ol>
-    <li>Configure Host, Relay Server, Key and client options, then click Generate.</li>
-    <li>Upload the downloaded <strong>payload.json</strong> using the link below. Choose <strong>Commit changes</strong> directly to <strong>master</strong>.</li>
-    <li>Open GitHub Actions and download the Windows artifact when the build completes.</li>
-  </ol>
+  <p dir="rtl" lang="fa">توکن را یک‌بار در همین صفحه وارد کنید، تنظیمات را تکمیل کنید و Generate را بزنید؛ ساخت مستقیم شروع می‌شود و نیازی به دانلود یا آپلود دستی نیست.</p>
+  <details open>
+    <summary>GitHub connection — direct builds</summary>
+    <p dir="rtl">توکن Fine-grained برای مخزن rdgen با دسترسی Actions و Contents روی Read and write لازم است. توکن فقط تا زمان باز بودن همین صفحه نگه داشته می‌شود؛ با بستن یا بازخوانی صفحه پاک می‌شود.</p>
+    <label for="github-token">GitHub token</label>
+    <input id="github-token" type="password" autocomplete="off" placeholder="github_pat_…">
+    <p>The token is sent only to api.github.com. It is not stored in browser storage or configuration files.</p>
+  </details>
   <div class="github-actions">
+    <button type="button" id="download-encrypted">Download encrypted file (manual alternative)</button>
     <a id="upload-link" href="https://github.com/mahdinosrati/rdgen/upload/master/.rdgen-inputs" target="_blank" rel="noopener">Upload to GitHub ↗</a>
     <a id="actions-link" href="https://github.com/mahdinosrati/rdgen/actions/workflows/generator-windows.yml" target="_blank" rel="noopener">Open GitHub Actions ↗</a>
   </div>
