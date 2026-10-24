@@ -7,7 +7,30 @@ DEFAULT_SERVER = 'rs-ny.rustdesk.com'
 DEFAULT_KEY = 'OeVuKk5nlHiXp+APNn0Y3pC1Iwpwn44JGqrQCsWqmBw='
 
 
+def normalize_relay(value):
+    value = str(value or '').strip()
+    if not value:
+        return ''
+    if any(c.isspace() or c in '/?#@' or ord(c) == 92 for c in value):
+        raise ValueError('Relay Server must be a hostname or IP with an optional port.')
+    try:
+        parsed = urlsplit('//' + value)
+        host = parsed.hostname
+        port = parsed.port
+        if not host or (port is not None and not 1 <= port <= 65535):
+            raise ValueError()
+        try:
+            ipaddress.ip_address(host)
+        except ValueError:
+            if not re.fullmatch(r'[A-Za-z0-9](?:[A-Za-z0-9.-]*[A-Za-z0-9])?', host):
+                raise ValueError()
+    except ValueError:
+        raise ValueError('Invalid Relay Server. Use host:port or [IPv6]:port.') from None
+    return (f'[{host}]' if ':' in host else host) + (f':{port}' if port else '')
+
+
 def normalize_network(params):
+    normalize_relay(params.get('relayServer'))
     host = str(params.get('serverIP') or DEFAULT_SERVER).strip()
     try:
         ipaddress.ip_address(host.strip('[]'))
@@ -52,4 +75,7 @@ def apply_network_settings(config, params):
         'key': network['key'],
         'api-server': network['apiServer'],
     })
+    relay = normalize_relay(params.get('relayServer'))
+    if relay:
+        config['override-settings']['relay-server'] = relay
     return network

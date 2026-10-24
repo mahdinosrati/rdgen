@@ -5,20 +5,24 @@
 Open [the configuration editor](https://mahdinosrati.github.io/rdgen/).
 No Django server is required for Windows 64-bit builds:
 
-1. Fill in the client options and your RustDesk server host, port and public key.
-2. Select **Copy build JSON**, then **Open GitHub Actions**.
-3. Choose **Run workflow**, paste the JSON into `config_json`, and leave `zip_url` empty.
-4. Download `windows-client-…` from the completed run's **Artifacts** section.
+1. Fill in the client options, Host, Relay Server, port and public key.
+2. Click **Generate Custom Client** to download encrypted `payload.json`.
+3. Click **Upload to GitHub**, upload that file and commit directly to `master`.
+4. The upload workflow starts the Windows build automatically. Download
+   `windows-client-…` from the completed generator run's **Artifacts** section.
 
-For large configurations, use **Generate Custom Client** with a fine-grained
-GitHub token granting **Actions and Contents read/write** on this repository.
+No personal access token is required. Sign in to GitHub with write access to
+this repository to upload the file. GitHub Pages cannot authorize builds by
+itself; the GitHub upload/commit is the authorization step.
+
 The editor removes duplicate image fields and encrypts the configuration and
 original PNGs with AES-256-GCM, wrapping its random key with the repository's
-RSA-OAEP public key. Only an encrypted payload goes into a temporary
-`rdgen-inputs/…` branch; Actions decrypts it using `RDGEN_PRIVATE_KEY` and deletes
-the branch after the build. Configurations up to 15 MB are accepted without
-resizing images. The token is never saved or included in configuration exports.
-Small configurations can still use the manual `config_json` workflow input.
+RSA-OAEP public key. Upload only encrypted `payload.json`, never your original
+configuration. Actions moves the encrypted input to a temporary branch and
+removes it from master; the temporary branch is deleted after the build.
+Encrypted content remains in Git history. Configurations up to 15 MB are
+accepted without resizing images. Small configurations can still use the
+manual `config_json` workflow input.
 Downloaded clients necessarily contain their preset password, so avoid private
 passwords in public builds even though the upload itself is encrypted.
 Other platforms still use the Django service described below.
@@ -27,6 +31,10 @@ Fork maintainers must provision their own `RDGEN_PRIVATE_KEY` Actions secret and
 matching public JWK in `web/build-key.json` before using encrypted uploads.
 
 ### Network behavior
+
+A nonempty Relay Server field overrides any manual `relay-server` setting;
+leave it blank to retain manual configuration or server discovery. Use
+`relay.example.org:21117` or `[IPv6]:21117`.
 
 The host, port, public key and API URL are embedded in `override-settings` for
 every connection direction and permission mode, replacing stale local network

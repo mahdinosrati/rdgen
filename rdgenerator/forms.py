@@ -38,6 +38,7 @@ class GenerateForm(forms.Form):
     #Custom Server
     serverIP = forms.CharField(label="Host", required=False)
     serverPort = forms.CharField(label="Port", required=False)
+    relayServer = forms.CharField(label="Relay Server", required=False)
     apiServer = forms.CharField(label="API Server", required=False)
     key = forms.CharField(label="Key", required=False)
     urlLink = forms.CharField(label="Custom URL for links", required=False)

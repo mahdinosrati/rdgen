@@ -104,3 +104,19 @@ class DispatchTests(TestCase):
                 self.assertEqual(custom['override-settings']['key'], 'abc=')
             finally:
                 os.chdir(previous)
+
+class RelayTests(SimpleTestCase):
+    def test_explicit_relay_overrides_manual(self):
+        c = build_custom_config({'relayServer': 'relay.example.org:21117', 'overrideManual': 'relay-server=old.example.org:21117'})
+        self.assertEqual(c['override-settings']['relay-server'], 'relay.example.org:21117')
+
+    def test_blank_relay_preserves_manual(self):
+        c = build_custom_config({'relayServer': '', 'overrideManual': 'relay-server=old.example.org:21117'})
+        self.assertEqual(c['override-settings']['relay-server'], 'old.example.org:21117')
+
+    def test_relay_validation(self):
+        from .network import normalize_relay
+        self.assertEqual(normalize_relay('[2001:db8::1]:21117'), '[2001:db8::1]:21117')
+        for value in ('https://relay.example.org', 'relay.example.org:70000', 'user@relay.example.org', 'relay.example.org/path'):
+            with self.subTest(value=value), self.assertRaises(ValueError):
+                normalize_relay(value)

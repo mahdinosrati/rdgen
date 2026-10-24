@@ -34,6 +34,7 @@ function networkPreview() {
   document.getElementById('network-preview').textContent = JSON.stringify({
     'custom-rendezvous-server': (host.includes(':') && !host.startsWith('[') ? `[${host}]` : host) + ':' + port,
     key: document.getElementById('id_key').value.trim() || (host === 'rs-ny.rustdesk.com' ? 'OeVuKk5nlHiXp+APNn0Y3pC1Iwpwn44JGqrQCsWqmBw=' : ''),
+    'relay-server': document.getElementById('id_relayServer').value.trim(),
     'api-server': api.replace(/\/$/, '')
   }, null, 2);
 }
@@ -53,61 +54,28 @@ async function buildConfig() {
   return {config, json};
 }
 
-document.getElementById('copy-build').addEventListener('click', async () => {
-  try {
-    const {json} = await buildConfig();
-    if (new TextEncoder().encode(json).length > 60000) throw new Error('این فایل برای کپی در Workflow بزرگ است. توکن GitHub را وارد کنید و Generate را بزنید؛ تصاویر بدون کاهش کیفیت به‌صورت رمزگذاری‌شده ارسال می‌شوند.');
-    await navigator.clipboard.writeText(json);
-    status('Copied. Open GitHub Actions → Run workflow → paste into config_json. Leave zip_url empty.');
-  } catch (error) { status(error.message); }
-});
-
 builderForm.addEventListener('submit', async event => {
   event.preventDefault();
   const button = builderForm.querySelector('button[type="submit"]');
-  let uploadRef = null;
-  let dispatchStarted = false;
-  const tokenField = document.getElementById('github-token');
-  const token = tokenField.value.trim();
-  async function github(path, method = 'GET', body) {
-    const response = await fetch(`https://api.github.com/repos/${repository}/${path}`, {
-      method, headers: {Accept: 'application/vnd.github+json', Authorization: `Bearer ${token}`, 'Content-Type': 'application/json'},
-      body: body === undefined ? undefined : JSON.stringify(body)
-    });
-    if (!response.ok) {
-      const detail = await response.json().catch(() => ({}));
-      throw new Error(`GitHub ${response.status}: ${detail.message || 'Request failed'}. Token needs Actions and Contents read/write permission.`);
-    }
-    return response.status === 204 ? null : response.json();
-  }
   try {
     const {config, json} = await buildConfig();
-    if (!token) {
-      status('برای شروع ساخت، توکن GitHub با دسترسی نوشتن Actions و Contents را وارد کنید. ورود به حساب GitHub به‌تنهایی به این صفحه دسترسی ساخت نمی‌دهد.');
-      tokenField.closest('details').open = true;
-      tokenField.scrollIntoView({behavior: 'smooth', block: 'center'});
-      tokenField.focus();
-      return;
-    }
-    if (config.permanentPassword && !document.getElementById('password-artifact-consent').checked) throw new Error('رمز دائمی داخل فایل اجرایی قرار می‌گیرد و خوانندگان مخزن می‌توانند آن را استخراج کنند. رمز را حذف کنید یا تأیید مربوط به رمز را در بخش GitHub فعال کنید.');
+    if (config.permanentPassword && !document.getElementById('password-artifact-consent').checked) throw new Error('Confirm the permanent password notice before generating a public client.');
     button.disabled = true;
     status('Encrypting configuration and images…');
     const envelope = await encryptConfig(json);
-    const head = await github('git/ref/heads/master');
-    uploadRef = `rdgen-inputs/${crypto.randomUUID()}`;
-    await github('git/refs', 'POST', {ref: `refs/heads/${uploadRef}`, sha: head.object.sha});
-    status('Uploading encrypted configuration and images…');
-    await github('contents/.rdgen-inputs/payload.json', 'PUT', {message: 'Temporary encrypted build input', branch: uploadRef, content: toBase64(new TextEncoder().encode(JSON.stringify(envelope)))});
-    status('Starting GitHub Actions build…');
-    dispatchStarted = true;
-    await github(`actions/workflows/${workflow}/dispatches`, 'POST', {ref: 'master', inputs: {version: config.version, config_ref: uploadRef, config_json: '', app_version: config.app_version || '', zip_url: ''}});
-    status('ساخت شروع شد. برای مشاهدهٔ پیشرفت و دریافت خروجی، Open GitHub Actions را باز کنید.');
-    actionsLink.focus();
-  } catch (error) {
-    if (uploadRef && !dispatchStarted) await github(`git/refs/heads/${uploadRef}`, 'DELETE').catch(() => {});
-    status(error.message + (dispatchStarted ? ' Check GitHub Actions before retrying.' : ''));
-  }
-  finally { button.disabled = false; tokenField.value = ''; }
+    envelope.build_version = config.version;
+    envelope.app_version = config.app_version || '';
+    const url = URL.createObjectURL(new Blob([JSON.stringify(envelope)], {type: 'application/json'}));
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = 'payload.json';
+    link.click();
+    setTimeout(() => URL.revokeObjectURL(url), 30000);
+    document.getElementById('upload-instructions').hidden = false;
+    status('فایل payload.json آماده شد. روی Upload to GitHub بزنید، همین فایل را انتخاب کنید و Commit changes را روی master انجام دهید. ساخت خودکار شروع می‌شود؛ توکن لازم نیست.');
+    document.getElementById('upload-link').focus();
+  } catch (error) { status(error.message); }
+  finally { button.disabled = false; }
 });
 builderForm.addEventListener('input', networkPreview);
 networkPreview();

@@ -1,0 +1,42 @@
+name: Start build from uploaded configuration
+on:
+  push:
+    branches: [master]
+    paths: ['.rdgen-inputs/payload.json']
+permissions:
+  contents: write
+  actions: write
+jobs:
+  dispatch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/github-script@v7
+        with:
+          script: |
+            const path = '.rdgen-inputs/payload.json';
+            // A deletion commit needs no build. Read the exact push commit to
+            // avoid racing another user's upload.
+            let file;
+            try {
+              file = (await github.rest.repos.getContent({...context.repo, path, ref: context.sha})).data;
+            } catch (error) {
+              if (error.status === 404) return;
+              throw error;
+            }
+            const blob = (await github.rest.git.getBlob({...context.repo, file_sha: file.sha})).data;
+            const envelope = JSON.parse(Buffer.from(blob.content, 'base64').toString('utf8'));
+            if (envelope.version !== 1 || !envelope.key || !envelope.iv || !envelope.data) throw new Error('Upload an encrypted payload.json from the RDGen editor.');
+            const version = envelope.build_version || '1.5.0';
+            const appVersion = envelope.app_version || '';
+            if (!['1.5.0', 'master'].includes(version)) throw new Error('Unsupported build version');
+            if (appVersion && !/^[0-9]+\.[0-9]+\.[0-9]+(?:[-+][A-Za-z0-9.-]+)?$/.test(appVersion)) throw new Error('Invalid application version');
+            const ref = `rdgen-inputs/${require('crypto').randomUUID()}`;
+            await github.rest.git.createRef({...context.repo, ref: `refs/heads/${ref}`, sha: context.sha});
+            await github.rest.actions.createWorkflowDispatch({...context.repo, workflow_id: 'generator-windows.yml', ref: 'master', inputs: {version, config_ref: ref, app_version: appVersion}});
+            core.notice('Windows build started. Open Custom Windows Client Generator to follow progress.');
+            // Remove the encrypted upload from the default branch after dispatch.
+            // The temporary input branch is retained until the build completes.
+            const current = (await github.rest.repos.getContent({...context.repo, path, ref: 'master'})).data;
+            if (current.sha === file.sha) {
+              await github.rest.repos.deleteFile({...context.repo, path, branch: 'master', sha: file.sha, message: 'Remove dispatched encrypted build input'});
+            }
