@@ -24,6 +24,7 @@ runs:
         shutil.copytree('.github/scripts', target, dirs_exist_ok=True)
         with open(os.environ['GITHUB_ENV'], 'a', encoding='utf-8') as f:
             f.write('NETWORK_PATCH=' + str(target / 'patch_network.py') + '\n')
+            f.write('PACKAGE_VERIFIER=' + str(target / 'verify_windows_package.py') + '\n')
     - name: Load standalone configuration
       if: inputs.config_json != ''
       shell: bash
