@@ -1,6 +1,34 @@
 name: Custom Windows Client Generator
 run-name: Custom Windows Client Generator
 on: 
+  workflow_call:
+    inputs:
+      config_ref:
+        description: 'Encrypted configuration branch (set by the web editor)'
+        required: false
+        default: ''
+        type: string
+      version:
+        description: 'version to buld'
+        required: false
+        default: '1.5.0'
+        type: string
+      config_json:
+        description: 'Saved configuration JSON (standalone build, no server required)'
+        required: false
+        default: ''
+        type: string
+      zip_url:
+        description: 'url to zip of json (legacy server mode)'
+        required: false
+        default: ''
+        type: string
+      app_version:
+        description: 'custom app version string (overrides build version)'
+        required: false
+        default: ''
+        type: string
+
   workflow_dispatch:
     inputs:
       config_ref:
@@ -110,7 +138,7 @@ jobs:
           INPUT_APP_VERSION: ${{ inputs.app_version }}
         run: |
           import os, re
-          if os.environ['INPUT_VERSION'] not in ('1.5.0', 'master'):
+          if not re.fullmatch(r'(?:master|[0-9]+\.[0-9]+\.[0-9]+)', os.environ['INPUT_VERSION']):
               raise ValueError('Unsupported RustDesk version')
           value = os.environ['INPUT_APP_VERSION']
           if value and not re.fullmatch(r'[0-9]+\.[0-9]+\.[0-9]+(?:[-+][A-Za-z0-9.-]+)?', value):

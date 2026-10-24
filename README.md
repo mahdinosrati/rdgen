@@ -93,3 +93,20 @@ Save your configuration from the rdgen web interface, or generate your own, then
 - Avoid special characters or non-English characters in app name and file name
 - Build time is currently 30 - 45 minutes
 
+
+### Automatic stable release qualification
+
+The `Discover and qualify RustDesk releases` workflow checks upstream releases
+daily. Drafts, prereleases and versions older than the latest approved version
+are ignored. The newest untested candidate runs the actual Windows generator
+with synthetic network settings, including Relay Server. Only a successful
+build (including package configuration verification) updates
+`rdgenerator/supported_versions.json` and triggers a Pages deployment.
+The form reads this registry, so untested versions are never offered as stable.
+
+Failed attempts stay hidden and are recorded in `release_attempts.json` with
+a link to the run. They are not rebuilt daily unless the upstream release
+changes; after fixing compatibility, manually run the discovery workflow with
+`retry_failed` enabled. Nightly remains an explicit development option.
+This qualification covers Windows 64-bit packaging, not live server connections
+or every operating system.

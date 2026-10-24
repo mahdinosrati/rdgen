@@ -3,6 +3,7 @@ import re
 from django import forms
 from PIL import Image
 from .network import normalize_network
+from .versions import version_choices, stable_versions
 
 # App/company names are interpolated into single/double-quoted bash sed
 # scripts in every generator workflow: & \ | corrupt the substitution
@@ -13,7 +14,7 @@ class GenerateForm(forms.Form):
     sh_secret_field = forms.CharField(required=False)
     #Platform
     platform = forms.ChoiceField(choices=[('windows','Windows 64Bit'),('windows-x86','Windows 32Bit'),('linux','Linux'),('android','Android'),('macos','macOS')], initial='windows')
-    version = forms.ChoiceField(choices=[('master','nightly'),('1.5.0','1.5.0')], initial='1.5.0')
+    version = forms.ChoiceField(choices=version_choices, initial=stable_versions()[0])
     help_text="'master' is the development version (nightly build) with the latest features but may be less stable"
     delayFix = forms.BooleanField(initial=True, required=False)
 
