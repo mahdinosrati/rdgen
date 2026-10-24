@@ -1,0 +1,59 @@
+name: Verify encrypted Windows checkout cleanup
+on:
+  workflow_dispatch:
+    inputs:
+      config_ref:
+        description: Temporary branch containing synthetic encrypted test input
+        required: true
+        type: string
+permissions:
+  contents: read
+jobs:
+  verify:
+    runs-on: windows-2022
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Load Secrets
+        uses: ./.github/actions/decrypt-secrets
+        with:
+          config_ref: ${{ inputs.config_ref }}
+          private_key: ${{ secrets.RDGEN_PRIVATE_KEY }}
+          zip_password: ''
+      - name: Verify synthetic configuration was decrypted
+        shell: python
+        run: |
+          import base64, json, os, pathlib
+          config = json.loads(base64.b64decode(os.environ['custom']))
+          assert config['override-settings']['custom-rendezvous-server'] == 'rdgen-validation.invalid:30116'
+          assert not (pathlib.Path(os.environ['RUNNER_TEMP']) / 'rdgen-encrypted-payload.json').exists()
+      # Reproduce the real build replacing the local action before post-job cleanup.
+      - name: Replace workspace with upstream source
+        uses: actions/checkout@v4
+        with:
+          repository: rustdesk/rustdesk
+          ref: refs/tags/1.5.0
+          sparse-checkout: README.md
+          sparse-checkout-cone-mode: false
+      - name: Confirm original local action was removed
+        shell: python
+        run: |
+          from pathlib import Path
+          assert not Path('.github/actions/decrypt-secrets/action.yml').exists()
+  cleanup-encrypted-input:
+    needs: verify
+    if: always()
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/github-script@v7
+        env:
+          CONFIG_REF: ${{ inputs.config_ref }}
+        with:
+          script: |
+            const ref = process.env.CONFIG_REF;
+            if (!/^rdgen-inputs\/[0-9a-f-]{36}$/.test(ref)) throw new Error('Invalid input branch');
+            await github.rest.git.deleteRef({...context.repo, ref: `heads/${ref}`});

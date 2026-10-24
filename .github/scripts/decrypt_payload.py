@@ -25,7 +25,10 @@ if __name__ == '__main__':
     pem = os.environ.get('RDGEN_PRIVATE_KEY', '')
     if not pem:
         raise ValueError('Repository RDGEN_PRIVATE_KEY secret is not configured')
-    payload = Path('.rdgen-payload/.rdgen-inputs/payload.json')
-    data = decrypt(json.loads(payload.read_text(encoding='utf-8')), pem)
+    payload = Path(os.environ['RUNNER_TEMP']) / 'rdgen-encrypted-payload.json'
+    try:
+        data = decrypt(json.loads(payload.read_text(encoding='utf-8')), pem)
+    finally:
+        payload.unlink(missing_ok=True)
     export_env(prepare(data))
     print('Encrypted configuration authenticated, decrypted and validated.')
