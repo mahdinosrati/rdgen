@@ -120,3 +120,19 @@ class RelayTests(SimpleTestCase):
         for value in ('https://relay.example.org', 'relay.example.org:70000', 'user@relay.example.org', 'relay.example.org/path'):
             with self.subTest(value=value), self.assertRaises(ValueError):
                 normalize_relay(value)
+
+class WindowsNameTests(SimpleTestCase):
+    def test_install_safe_name_in_config_and_build(self):
+        data = {'appname': 'Bamdad Desk', 'platform': 'windows'}
+        self.assertEqual(build_custom_config(data)['app-name'], 'BamdadDesk')
+        result = script('serverless_config').prepare(data)
+        self.assertEqual(result['appname'], 'BamdadDesk')
+        self.assertEqual(json.loads(base64.b64decode(result['custom']))['app-name'], 'BamdadDesk')
+
+    def test_safe_names_and_invalid_names(self):
+        from .naming import normalize_app_name
+        self.assertEqual(normalize_app_name('Desk_Admin'), 'Desk-Admin')
+        self.assertEqual(normalize_app_name('Desk-1'), 'Desk-1')
+        for name in ('Desk&Admin', '   ', 'Desk.exe'):
+            with self.subTest(name=name), self.assertRaises(ValueError):
+                normalize_app_name(name)

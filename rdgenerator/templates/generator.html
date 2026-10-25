@@ -281,7 +281,8 @@
                     <label for="{{ form.exename.id_for_label }}">Name of the configuration (no spaces or special characters, English characters only):</label>
                     {{ form.exename }}<span id="filenameError" class="error"></span><br><br>
                     <label for="{{ form.appname.id_for_label }}">Custom Application Name (leave blank to use default):</label>
-                    {{ form.appname }}<br><br>
+                    {{ form.appname }}
+                    <small>Windows: spaces are removed and underscores become hyphens for installer compatibility (Bamdad Desk → BamdadDesk).</small><br><br>
                     <label for="{{ form.direction.id_for_label }}">Connection Type:</label>
                     {{ form.direction }}<br><br>
                     <label for="{{ form.installation.id_for_label }}">Disable Installation:</label>

@@ -10,6 +10,7 @@ import uuid
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 from rdgenerator.configuration import build_custom_config
 from rdgenerator.network import normalize_network
+from rdgenerator.naming import normalize_app_name
 
 
 def prepare(data):
@@ -42,7 +43,8 @@ def prepare(data):
     }.items():
         if field in data and data[field] not in choices:
             raise ValueError(f'Invalid {field}')
-    app = data.get('appname') or 'rustdesk'
+    app = normalize_app_name(data.get('appname'))
+    data['appname'] = app
     if not app.isascii():
         raise ValueError('Application name must use ASCII characters')
     slug = re.sub(r'[-\s]+', '-', re.sub(r'[^\w\s-]', '', app.lower()).strip())

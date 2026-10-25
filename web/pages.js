@@ -44,6 +44,11 @@ async function buildConfig() {
   const config = await saveFormData(false);
   if (!config) throw new Error('A configuration filename is required.');
   if (config.platform !== 'windows') throw new Error('Standalone builds currently support Windows 64-bit. Use Save Configuration for other platforms.');
+  if (config.appname) {
+    config.appname = config.appname.replace(/\s+/g, '').replace(/_/g, '-');
+    if (!/^[A-Za-z0-9-]+$/.test(config.appname)) throw new Error('Windows app name must contain English letters, numbers or hyphens.');
+    document.getElementById('id_appname').value = config.appname;
+  }
   const port = String(config.serverPort || '21116');
   if (!/^\d+$/.test(port) || Number(port) < 1 || Number(port) > 65532) throw new Error('Port must be between 1 and 65532.');
   for (const kind of ['icon', 'logo', 'privacy']) {

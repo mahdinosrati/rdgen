@@ -3,6 +3,7 @@ import re
 from django import forms
 from PIL import Image
 from .network import normalize_network
+from .naming import normalize_app_name
 from .versions import version_choices, stable_versions
 
 # App/company names are interpolated into single/double-quoted bash sed
@@ -140,6 +141,8 @@ class GenerateForm(forms.Form):
         cleaned = super().clean()
         try:
             normalize_network(cleaned)
+            if cleaned.get('appname'):
+                cleaned['appname'] = normalize_app_name(cleaned['appname'], cleaned.get('platform', 'windows'))
         except ValueError as exc:
             raise forms.ValidationError(str(exc))
         return cleaned

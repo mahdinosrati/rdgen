@@ -11,6 +11,7 @@ import os
 from pathlib import Path
 import struct
 import sys
+import re
 
 import brotli
 
@@ -66,6 +67,8 @@ def verify(path, expected_config):
     config = json.loads(base64.b64decode(unpack_entry(files['custom_.txt']), validate=True))
     if config != expected_config:
         raise ValueError('Packaged custom_.txt differs from the requested configuration')
+    if not re.fullmatch(r'[A-Za-z0-9-]+', config.get('app-name', 'RustDesk')):
+        raise ValueError('Packaged application name is incompatible with Windows installation')
     # Flutter's EXE is a C++ launcher; the Rust config loader lives in its DLL.
     # Legacy Sciter builds contain the loader directly in the executable.
     client = 'librustdesk.dll' if 'librustdesk.dll' in files else next(
@@ -73,7 +76,7 @@ def verify(path, expected_config):
     if b'custom_.txt' not in unpack_entry(files[client]):
         raise ValueError('Packaged client does not reference custom_.txt')
     return {'filename': Path(path).name, 'embedded_files': len(files),
-            'configuration_matches': True, 'loader_matches': True, 'loader_file': client,
+            'configuration_matches': True, 'installer_name_valid': True, 'loader_matches': True, 'loader_file': client,
             'sha256': hashlib.sha256(Path(path).read_bytes()).hexdigest()}
 
 

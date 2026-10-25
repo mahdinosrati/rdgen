@@ -1,5 +1,6 @@
 """Pure configuration builder, used by Django and GitHub Actions."""
 from .network import apply_network_settings
+from .naming import normalize_app_name
 
 
 def build_custom_config(params):
@@ -8,7 +9,7 @@ def build_custom_config(params):
     direction = params.get('direction', 'both')
     installation = params.get('installation', 'installationY')
     settings = params.get('settings', 'settingsY')
-    appname = params.get('appname', '')
+    appname = normalize_app_name(params.get('appname'), platform)
     if not appname:
         appname = "rustdesk"
     permPass = params.get('permanentPassword', '')

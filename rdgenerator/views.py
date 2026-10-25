@@ -1,3 +1,4 @@
+from .naming import normalize_app_name
 import io
 from pathlib import Path
 from django.http import HttpResponse, JsonResponse, HttpResponseForbidden
@@ -49,6 +50,8 @@ def generate_custom_client(params, full_url):
     user_secret = params.get('sh_secret_field', '')
     selfhosted = (_settings.SH_SECRET == user_secret)
     platform = params.get('platform', 'windows')
+    params = dict(params)
+    params['appname'] = normalize_app_name(params.get('appname'), platform)
     version = params.get('version', '1.5.0')
     app_version = params.get('app_version', '')
     # app_version overrides the version string embedded in the built client
