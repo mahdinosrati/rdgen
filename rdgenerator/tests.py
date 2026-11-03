@@ -73,6 +73,17 @@ class NetworkTests(SimpleTestCase):
         self.assertEqual(config['default-settings']['direct-server'], 'N')
         self.assertEqual(env['rdgen'], 'standalone')
 
+    def test_serverless_macos_branding_and_network(self):
+        env = script('serverless_config').prepare({
+            'platform': 'macos', 'appname': 'BamdadDesk', 'exename': 'bamdad',
+            'serverIP': 'example.org', 'overrideManual': 'relay-server=relay.example.org:21117',
+        })
+        config = json.loads(base64.b64decode(env['custom']))
+        self.assertEqual(config['app-name'], 'BamdadDesk')
+        self.assertEqual(config['override-settings']['custom-rendezvous-server'], 'example.org:21116')
+        self.assertEqual(config['override-settings']['relay-server'], 'relay.example.org:21117')
+        self.assertEqual(env['filename'], 'bamdad')
+
     def test_patcher_fails_on_upstream_change(self):
         with tempfile.TemporaryDirectory() as folder:
             root = Path(folder)

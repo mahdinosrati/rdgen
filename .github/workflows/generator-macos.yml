@@ -3,6 +3,16 @@ run-name: Custom macOS Client Generator
 on: 
   workflow_dispatch:
     inputs:
+      config_json:
+        description: 'Saved configuration JSON (standalone build)'
+        required: false
+        default: ''
+        type: string
+      config_ref:
+        description: 'Encrypted configuration branch'
+        required: false
+        default: ''
+        type: string
       version:
         description: 'version to buld'
         required: true
@@ -10,7 +20,7 @@ on:
         type: string
       zip_url:
         description: 'url to zip of json'
-        required: true
+        required: false
         default: ''
         type: string
       app_version:
@@ -82,10 +92,23 @@ jobs:
       STATUS_URL: "${{ secrets.GENURL }}/updategh"
 
     steps:
+      - name: Validate build inputs
+        shell: python
+        env:
+          INPUT_VERSION: ${{ inputs.version }}
+          INPUT_APP_VERSION: ${{ inputs.app_version }}
+        run: |
+          import os, re
+          if not re.fullmatch(r'(?:master|[0-9]+\.[0-9]+\.[0-9]+)', os.environ['INPUT_VERSION']):
+              raise ValueError('Unsupported RustDesk version')
+          value = os.environ['INPUT_APP_VERSION']
+          if value and not re.fullmatch(r'[0-9]+\.[0-9]+\.[0-9]+(?:[-+][A-Za-z0-9.-]+)?', value):
+              raise ValueError('Invalid application version')
       - name: Checkout Repository
         uses: actions/checkout@v4
         
       - uses: actions/download-artifact@v4
+        if: inputs.config_json == '' && inputs.config_ref == ''
         with:
           name: encrypted-secrets-zip
 
@@ -93,9 +116,12 @@ jobs:
         uses: ./.github/actions/decrypt-secrets
         with:
           zip_password: ${{ secrets.ZIP_PASSWORD }}
+          config_json: ${{ inputs.config_json }}
+          config_ref: ${{ inputs.config_ref }}
+          private_key: ${{ secrets.RDGEN_PRIVATE_KEY }}
 
       - name: Finalize and Cleanup zip/json
-        if: always() # Run even if previous steps fail
+        if: ${{ always() && inputs.config_json == '' && inputs.config_ref == '' }}
         continue-on-error: true
         uses: fjogeleit/http-request-action@v1
         with:
@@ -311,10 +337,14 @@ jobs:
           mkdir -p ./rustdesk/data/flutter_assets/assets
 
           # Download icon using curl with additional SSL options
-          curl -k -L --tlsv1.2 --proto =https --ssl-reqd \
-            -H "User-Agent: Mozilla/5.0" \
-            "${{ env.iconlink_url }}/get_png?filename=${{ env.iconlink_file }}&uuid=${{ env.iconlink_uuid }}" \
-            -o ./res/icon.png || wget --no-check-certificate -O ./res/icon.png "${{ env.iconlink_url }}/get_png?filename=${{ env.iconlink_file }}&uuid=${{ env.iconlink_uuid }}"
+          if [ "${{ env.iconlink_url }}" = "local" ]; then
+            cp "$RUNNER_TEMP/rdgen-images/icon.png" ./res/icon.png
+          else
+            curl -k -L --tlsv1.2 --proto =https --ssl-reqd \
+              -H "User-Agent: Mozilla/5.0" \
+              "${{ env.iconlink_url }}/get_png?filename=${{ env.iconlink_file }}&uuid=${{ env.iconlink_uuid }}" \
+              -o ./res/icon.png || wget --no-check-certificate -O ./res/icon.png "${{ env.iconlink_url }}/get_png?filename=${{ env.iconlink_file }}&uuid=${{ env.iconlink_uuid }}"
+          fi
             
           # Backup existing files (if they exist)
           [ -f "./res/32x32.png" ] && mv ./res/32x32.png ./res/32x32.png.bak
@@ -532,7 +562,8 @@ jobs:
             sed -i -e "s/osx_minimum_system_version = \"[0-9]*.[0-9]*\"/osx_minimum_system_version = \"${MIN_MACOS_VERSION}\"/" Cargo.toml
             sed -i -e "s/MACOSX_DEPLOYMENT_TARGET = [0-9]*.[0-9]*;/MACOSX_DEPLOYMENT_TARGET = ${MIN_MACOS_VERSION};/" flutter/macos/Runner.xcodeproj/project.pbxproj
           fi
-          sed -i -e "s/RustDesk.app/\"${{ env.appname }}.app\"/" build.py
+          sed -i -e "s/RustDesk.app/${{ env.appname }}.app/g" build.py
+          python -m py_compile build.py
           ./build.py --flutter --hwcodec --unix-file-copy-paste ${{ matrix.job.extra-build-args }}
 
       # - name: Copy service file
@@ -583,6 +614,9 @@ jobs:
         shell: bash
         run: |
           ASSETS_DIR="build/macos/Build/Products/Release/RustDesk.app/Contents/Frameworks/App.framework/Versions/Current/Resources/flutter_assets/assets"
+          if [ "${{ env.rdgen }}" = standalone ]; then
+            ASSETS_DIR="flutter/build/macos/Build/Products/Release/${{ env.appname }}.app/Contents/Frameworks/App.framework/Versions/Current/Resources/flutter_assets/assets"
+          fi
           mkdir -p "$ASSETS_DIR"
           if [ -f "$ASSETS_DIR/icon.svg" ]; then
             mv "$ASSETS_DIR/icon.svg" "$ASSETS_DIR/icon.svg.bak"
@@ -599,14 +633,21 @@ jobs:
         shell: bash
         run: |
           ASSETS_DIR="build/macos/Build/Products/Release/RustDesk.app/Contents/Frameworks/App.framework/Versions/Current/Resources/flutter_assets/assets"
+          if [ "${{ env.rdgen }}" = standalone ]; then
+            ASSETS_DIR="flutter/build/macos/Build/Products/Release/${{ env.appname }}.app/Contents/Frameworks/App.framework/Versions/Current/Resources/flutter_assets/assets"
+          fi
           mkdir -p "$ASSETS_DIR"
-          curl -k -L --tlsv1.2 --proto =https --ssl-reqd \
-            -H "User-Agent: Mozilla/5.0" \
-            "${{ env.logolink_url }}/get_png?filename=${{ env.logolink_file }}&uuid=${{ env.logolink_uuid }}" \
-            -o "$ASSETS_DIR/logo.png" || \
-          wget --no-check-certificate \
-            -O "$ASSETS_DIR/logo.png" \
-            "${{ env.logolink_url }}/get_png?filename=${{ env.logolink_file }}&uuid=${{ env.logolink_uuid }}"
+          if [ "${{ env.logolink_url }}" = "local" ]; then
+            cp "$RUNNER_TEMP/rdgen-images/logo.png" "$ASSETS_DIR/logo.png"
+          else
+            curl -k -L --tlsv1.2 --proto =https --ssl-reqd \
+              -H "User-Agent: Mozilla/5.0" \
+              "${{ env.logolink_url }}/get_png?filename=${{ env.logolink_file }}&uuid=${{ env.logolink_uuid }}" \
+              -o "$ASSETS_DIR/logo.png" || \
+            wget --no-check-certificate \
+              -O "$ASSETS_DIR/logo.png" \
+              "${{ env.logolink_url }}/get_png?filename=${{ env.logolink_file }}&uuid=${{ env.logolink_uuid }}"
+          fi
 
       - name: Sign macOS app bundle
         if: env.MACOS_P12_BASE64 != ''
@@ -692,6 +733,25 @@ jobs:
               exit 1
             fi
 
+      - name: Verify macOS bundle
+        env:
+          APP_NAME: ${{ env.appname }}
+          TARGET_ARCH: ${{ matrix.job.arch }}
+        run: |
+          APP="flutter/build/macos/Build/Products/Release/$APP_NAME.app"
+          EXECUTABLE=$(/usr/libexec/PlistBuddy -c 'Print CFBundleExecutable' "$APP/Contents/Info.plist")
+          ARCH="$TARGET_ARCH"
+          [ "$ARCH" != aarch64 ] || ARCH=arm64
+          lipo -verify_arch "$ARCH" "$APP/Contents/MacOS/$EXECUTABLE"
+          codesign --verify --deep --strict "$APP"
+          python - <<'PY'
+          import base64, json, os, pathlib
+          app = pathlib.Path('flutter/build/macos/Build/Products/Release') / (os.environ['APP_NAME'] + '.app')
+          config = json.loads(base64.b64decode((app / 'Contents/MacOS/custom_.txt').read_bytes()))
+          assert config == json.loads(base64.b64decode(os.environ['custom'])), 'Embedded configuration differs'
+          print('Architecture, signature and embedded configuration verified.')
+          PY
+
       - name: Create DMG
         run: |
           cd /Users/runner/work/${{ github.event.repository.name }}/${{ github.event.repository.name }}/flutter/build/macos/Build/Products/Release
@@ -739,6 +799,14 @@ jobs:
             exit 1
           fi
 
+      - name: Upload macOS installer
+        uses: actions/upload-artifact@v4
+        with:
+          name: macos-client-${{ matrix.job.arch }}
+          path: ${{ env.filename }}-${{ matrix.job.arch }}.dmg
+          if-no-files-found: error
+          retention-days: 30
+
       - name: send file to rdgen server
         if: ${{ env.rdgen == 'true' }}
         shell: bash
@@ -765,9 +833,25 @@ jobs:
     needs: [build-for-macos]
     runs-on: ubuntu-latest
     continue-on-error: true
-    if: always()
+    if: ${{ always() && inputs.config_json == '' && inputs.config_ref == '' }}
     steps:
       - name: Delete secrets artifact
         uses: geekyeggo/delete-artifact@v5
         with:
           name: encrypted-secrets-zip
+
+  cleanup-encrypted-input:
+    needs: [build-for-macos]
+    if: ${{ always() && inputs.config_ref != '' }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/github-script@v7
+        env:
+          CONFIG_REF: ${{ inputs.config_ref }}
+        with:
+          script: |
+            const ref = process.env.CONFIG_REF;
+            if (!/^rdgen-inputs\/[0-9a-f-]{36}$/.test(ref)) throw new Error('Invalid input branch');
+            await github.rest.git.deleteRef({...context.repo, ref: `heads/${ref}`});

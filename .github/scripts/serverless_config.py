@@ -17,8 +17,8 @@ def prepare(data):
     if not isinstance(data, dict):
         raise ValueError('Configuration must be a JSON object')
     data = dict(data)
-    if data.get('platform', 'windows') != 'windows':
-        raise ValueError('Standalone build supports Windows 64-bit only')
+    if data.get('platform', 'windows') not in ('windows', 'macos'):
+        raise ValueError('Standalone build supports Windows 64-bit and macOS only')
     # Saved web forms use "on" for checked boxes; JSON callers may use booleans.
     booleans = ('delayFix xOffline hidecm removeNewVersionNotif denyLan enableDirectIP '
                 'autoClose enableKeyboard enableClipboard enableFileTransfer enableAudio '
