@@ -742,7 +742,7 @@ jobs:
           EXECUTABLE=$(/usr/libexec/PlistBuddy -c 'Print CFBundleExecutable' "$APP/Contents/Info.plist")
           ARCH="$TARGET_ARCH"
           [ "$ARCH" != aarch64 ] || ARCH=arm64
-          lipo -verify_arch "$ARCH" "$APP/Contents/MacOS/$EXECUTABLE"
+          lipo "$APP/Contents/MacOS/$EXECUTABLE" -verify_arch "$ARCH"
           codesign --verify --deep --strict "$APP"
           python - <<'PY'
           import base64, json, os, pathlib
